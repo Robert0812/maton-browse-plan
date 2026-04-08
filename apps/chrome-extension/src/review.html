@@ -138,51 +138,29 @@
         color: #737373;
         font-size: 0.875rem;
       }
-      .exclude-panel {
-        margin-bottom: 16px;
-        padding: 12px 14px;
-        border: 1px solid #e5e5e5;
-        border-radius: 8px;
-        background: #fff;
-        font-size: 0.8125rem;
-      }
-      .exclude-panel legend {
-        font-weight: 600;
-        color: #171717;
-        padding: 0 4px;
-      }
-      .exclude-panel .exclude-hint {
-        margin: 0 0 10px;
-        font-size: 0.75rem;
-        font-weight: 400;
-        color: #737373;
-      }
-      .exclude-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-      .exclude-list label {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        margin: 0;
-        font-weight: 400;
-        cursor: pointer;
-        color: #404040;
-      }
-      .exclude-list input {
-        margin-top: 2px;
-        flex-shrink: 0;
-      }
-      tr.row-excluded td {
+      tr.row-excluded td:nth-child(n + 3) {
         opacity: 0.45;
         text-decoration: line-through;
         text-decoration-color: #a1a1aa;
       }
-      tr.row-excluded td:first-child {
-        text-decoration: none;
-        opacity: 1;
+      th.col-exclude,
+      td.col-exclude {
+        width: 1%;
+        white-space: nowrap;
+        text-align: center;
+        vertical-align: middle;
+      }
+      td.col-exclude label {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        cursor: pointer;
+        font-weight: 400;
+      }
+      td.col-exclude input {
+        margin: 0;
+        cursor: pointer;
       }
       .intent-panel {
         margin-top: 20px;
@@ -274,8 +252,8 @@
   <body>
     <h1>Review trace before Harness Generation</h1>
     <p class="lead">
-      Last history import. Queries stripped on send/download. Check <strong>Private sites</strong> below to drop
-      whole origins before Send or Download.
+      Last history import. Queries stripped on send/download. Use <strong>Exclude</strong> in the table to drop whole
+      origins before Send or Download.
     </p>
 
     <div class="stats" id="stats" aria-live="polite"></div>
@@ -290,20 +268,17 @@
       </select>
     </div>
 
-    <fieldset class="exclude-panel" id="excludePanel" hidden>
-      <legend>Private sites</legend>
-      <p class="exclude-hint">Checked origins are excluded from Send and Download.</p>
-      <div class="exclude-list" id="excludeOriginsList"></div>
-    </fieldset>
-
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
-            <th>Source</th>
-            <th>Origin / path</th>
-            <th>Dwell</th>
-            <th>When</th>
+            <th class="col-exclude" scope="col">
+              <abbr title="Exclude entire origin from Send and Download">Exclude</abbr>
+            </th>
+            <th scope="col">Source</th>
+            <th scope="col">Origin / path</th>
+            <th scope="col">Dwell</th>
+            <th scope="col">When</th>
           </tr>
         </thead>
         <tbody id="tbody"></tbody>
@@ -326,7 +301,7 @@
       <p class="intent-sub">
         Shown after <strong>Send to Skill Factory</strong> for the payload that was just sent. Same heuristic as the API:
         top sites from visits + dwell; interested functions only when <strong>history</strong> rows include a
-        <strong>?query</strong>. Changing private-site exclusions clears this until you send again.
+        <strong>?query</strong>. Changing exclusions in the table clears this until you send again.
       </p>
       <div id="intentPanelBody"></div>
     </section>

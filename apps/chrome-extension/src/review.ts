@@ -12,8 +12,6 @@ const exportPreset = document.getElementById("exportPreset") as HTMLSelectElemen
 const btnSend = document.getElementById("btnSend") as HTMLButtonElement;
 const btnDownload = document.getElementById("btnDownload") as HTMLButtonElement;
 const result = document.getElementById("result") as HTMLPreElement;
-const excludePanel = document.getElementById("excludePanel") as HTMLFieldSetElement;
-const excludeOriginsList = document.getElementById("excludeOriginsList") as HTMLDivElement;
 
 const MAX_ROWS = 200;
 
@@ -34,14 +32,6 @@ function formatWhen(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function uniqueOriginsSorted(events: TraceEvent[]): string[] {
-  const set = new Set<string>();
-  for (const ev of sanitizeBatch(events)) {
-    if (ev.origin) set.add(ev.origin);
-  }
-  return [...set].sort((a, b) => a.localeCompare(b));
 }
 
 function getFilteredEvents(): TraceEvent[] {
@@ -149,41 +139,16 @@ function updateExportDependentUi(): void {
   refreshStats();
   tbody.querySelectorAll("tr[data-origin]").forEach((tr) => {
     const o = tr.getAttribute("data-origin");
-    if (o) tr.classList.toggle("row-excluded", excludedOrigins.has(o));
+    if (!o) return;
+    const excluded = excludedOrigins.has(o);
+    tr.classList.toggle("row-excluded", excluded);
+    const cb = tr.querySelector<HTMLInputElement>(".exclude-origin-cb");
+    if (cb) cb.checked = excluded;
   });
   const canExport = rawEvents.length > 0 && exportEventCount() > 0;
   btnSend.disabled = !canExport;
   btnDownload.disabled = !canExport;
   hideIntentPanel();
-}
-
-function renderExcludePanel(origins: string[]): void {
-  excludedOrigins.clear();
-  excludeOriginsList.replaceChildren();
-  if (origins.length === 0) {
-    excludePanel.hidden = true;
-    return;
-  }
-  excludePanel.hidden = false;
-  origins.forEach((origin, i) => {
-    const row = document.createElement("div");
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.id = `exclude-origin-${i}`;
-    cb.addEventListener("change", () => {
-      if (cb.checked) excludedOrigins.add(origin);
-      else excludedOrigins.delete(origin);
-      updateExportDependentUi();
-    });
-    const span = document.createElement("span");
-    span.className = "mono";
-    span.textContent = origin;
-    const label = document.createElement("label");
-    label.htmlFor = cb.id;
-    label.append(cb, span);
-    row.appendChild(label);
-    excludeOriginsList.appendChild(row);
-  });
 }
 
 async function load(): Promise<void> {
@@ -199,10 +164,11 @@ async function load(): Promise<void> {
     showResult("Could not load trace data from the extension.");
     statsEl.textContent = "";
     emptyState.hidden = false;
-    excludePanel.hidden = true;
+    tbody.replaceChildren();
     rawEvents = [];
     liveCount = 0;
     historyCount = 0;
+    excludedOrigins.clear();
     updateExportDependentUi();
     return;
   }
@@ -211,14 +177,13 @@ async function load(): Promise<void> {
   exportPreset.value = res.preset ?? "24h";
   liveCount = res.liveCount ?? 0;
   historyCount = res.historyCount ?? 0;
+  excludedOrigins.clear();
 
   const n = rawEvents.length;
-  renderExcludePanel(uniqueOriginsSorted(rawEvents));
 
   tbody.replaceChildren();
   if (n === 0) {
     emptyState.hidden = false;
-    excludePanel.hidden = true;
     statsEl.innerHTML = "";
     tbody.replaceChildren();
     updateExportDependentUi();
@@ -234,22 +199,48 @@ async function load(): Promise<void> {
     const tr = document.createElement("tr");
     tr.dataset.origin = ev.origin;
     const src = ev.source ?? (ev.transition === "history_import" ? "history" : "live");
-    tr.innerHTML = `
-      <td>${src}</td>
-      <td class="mono">${ev.origin}${ev.path}</td>
-      <td>${ev.dwellMs ? `${ev.dwellMs} ms` : "—"}</td>
-      <td>${formatWhen(ev.capturedAt)}</td>
-    `;
+
+    const tdEx = document.createElement("td");
+    tdEx.className = "col-exclude";
+    const exLabel = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "exclude-origin-cb";
+    cb.title = `Exclude ${ev.origin} from Send and Download`;
+    cb.setAttribute("aria-label", `Exclude origin ${ev.origin} from Send and Download`);
+    cb.checked = excludedOrigins.has(ev.origin);
+    cb.addEventListener("change", () => {
+      if (cb.checked) excludedOrigins.add(ev.origin);
+      else excludedOrigins.delete(ev.origin);
+      updateExportDependentUi();
+    });
+    exLabel.appendChild(cb);
+    tdEx.appendChild(exLabel);
+
+    const tdSrc = document.createElement("td");
+    tdSrc.textContent = src;
+
+    const tdPath = document.createElement("td");
+    tdPath.className = "mono";
+    tdPath.textContent = `${ev.origin}${ev.path}`;
+
+    const tdDwell = document.createElement("td");
+    tdDwell.textContent = ev.dwellMs ? `${ev.dwellMs} ms` : "—";
+
+    const tdWhen = document.createElement("td");
+    tdWhen.textContent = formatWhen(ev.capturedAt);
+
+    tr.append(tdEx, tdSrc, tdPath, tdDwell, tdWhen);
     tbody.appendChild(tr);
   }
 
   if (n > MAX_ROWS) {
     const tr = document.createElement("tr");
     const td = document.createElement("td");
-    td.colSpan = 4;
+    td.colSpan = 5;
     td.style.fontStyle = "italic";
     td.style.color = "#71717a";
-    td.textContent = `+${n - MAX_ROWS} more rows (full log; private-site exclusions still apply).`;
+    td.textContent = `+${n - MAX_ROWS} more rows (full log; table exclusions still apply).`;
     tr.appendChild(td);
     tbody.appendChild(tr);
   }

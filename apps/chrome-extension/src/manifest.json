@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "WondersAgent Skill Factory — Capture",
+  "version": "0.1.0",
+  "description": "Phase 1: harvest browsing context (URL + dwell) for skill generation. Local sanitization before upload.",
+  "permissions": ["storage", "tabs", "history"],
+  "host_permissions": ["<all_urls>", "http://127.0.0.1/*", "http://localhost/*"],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Skill Factory Capture",
+    "default_popup": "popup.html"
+  }
+}

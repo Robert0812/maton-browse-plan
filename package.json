@@ -1,0 +1,19 @@
+{
+  "name": "wondersagent-skill-factory",
+  "private": true,
+  "version": "0.1.0",
+  "description": "History-driven pipeline that generates self-healing MCP skills from browsing traces",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:factory": "npm run dev --workspace=@skill-factory/api",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@9.14.2",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ]
+}

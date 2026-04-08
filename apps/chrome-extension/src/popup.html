@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Skill Factory Capture</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        width: 380px;
+        margin: 0;
+        padding: 12px;
+        color: #1a1a1a;
+        background: #fafafa;
+      }
+      h2 {
+        margin: 0 0 4px;
+        font-size: 15px;
+        font-weight: 600;
+      }
+      h3 {
+        margin: 14px 0 4px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #374151;
+      }
+      .sub {
+        font-size: 11px;
+        color: #666;
+        margin-bottom: 8px;
+        line-height: 1.35;
+      }
+      label {
+        display: block;
+        margin-top: 8px;
+        font-size: 11px;
+        font-weight: 500;
+        color: #444;
+      }
+      select {
+        width: 100%;
+        margin-top: 4px;
+        padding: 6px 8px;
+        font-size: 12px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        background: #fff;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      .row button {
+        flex: 1;
+      }
+      button {
+        width: 100%;
+        margin-top: 8px;
+        padding: 8px 10px;
+        font-size: 12px;
+        font-weight: 500;
+        border-radius: 6px;
+        border: 1px solid #bbb;
+        background: #fff;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #2563eb;
+        border-color: #1d4ed8;
+        color: #fff;
+      }
+      button.harness {
+        background: #4f46e5;
+        border-color: #4338ca;
+        color: #fff;
+      }
+      button.secondary {
+        background: #f0fdf4;
+        border-color: #86efac;
+        color: #166534;
+      }
+      button.danger {
+        color: #b91c1c;
+        border-color: #fca5a5;
+        background: #fff5f5;
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+      #status {
+        margin-top: 10px;
+        margin-bottom: 10px;
+        padding: 10px 10px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        background: #eef2ff;
+        border: 1px solid #c7d2fe;
+        color: #3730a3;
+      }
+      #status.idle {
+        background: #f4f4f5;
+        border-color: #d4d4d8;
+        color: #52525b;
+      }
+      .live-mode-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        margin-bottom: 6px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+      }
+      #status.idle .live-mode-line {
+        border-bottom-color: rgba(0, 0, 0, 0.06);
+        color: #3f3f46;
+      }
+      #status.recording .live-mode-line {
+        color: #14532d;
+        border-bottom-color: rgba(20, 83, 45, 0.12);
+      }
+      .live-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: #a1a1aa;
+        box-shadow: 0 0 0 2px rgba(161, 161, 170, 0.35);
+      }
+      #status.recording .live-dot {
+        background: #22c55e;
+        box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.45);
+        animation: live-pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes live-pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.85;
+          transform: scale(1.08);
+        }
+      }
+      .status-detail {
+        font-size: 11px;
+        font-weight: 400;
+        line-height: 1.4;
+        color: inherit;
+        opacity: 0.95;
+      }
+      #status.idle .status-detail {
+        opacity: 0.92;
+      }
+      #out {
+        margin-top: 8px;
+        font-size: 10px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 140px;
+        overflow: auto;
+        padding: 8px;
+        background: #fff;
+        border: 1px solid #e4e4e7;
+        border-radius: 6px;
+      }
+      hr {
+        border: none;
+        border-top: 1px solid #e5e7eb;
+        margin: 12px 0 4px;
+      }
+      #historyTrackStat {
+        margin-top: 10px;
+        margin-bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Skill Factory · Capture</h2>
+    <p class="sub">Import history then generate harness automatically</p>
+
+    <h3>1. Chrome history &amp; harness</h3>
+    <p class="sub">
+      Range applies to <strong>Import</strong> and the count between the buttons. Each import <strong>replaces</strong> the last batch.
+    </p>
+    <label for="historyRange">History time range</label>
+    <select id="historyRange" aria-label="History import time range">
+      <option value="1h">Last 1 hour</option>
+      <option value="24h">Last 24 hours</option>
+      <option value="7d" selected>Last 7 days</option>
+      <option value="30d">Last 30 days</option>
+    </select>
+    <button id="importHistory" class="secondary" type="button">Import History</button>
+    <p class="sub" id="historyTrackStat" aria-live="polite">Loading summary…</p>
+    <button id="harnessGeneration" class="harness" type="button">Harness Generation</button>
+
+    <hr />
+
+    <h3>2. Live recording</h3>
+    <p class="sub">
+      Separate from history. Rows finalize on navigation, tab switch, close, or stop. <strong>http/https</strong> only.
+    </p>
+
+    <div id="status" class="idle" role="status" aria-live="polite">
+      <div class="live-mode-line">
+        <span class="live-dot" id="liveDot" aria-hidden="true"></span>
+        <span id="liveModeLabel">Live recording: …</span>
+      </div>
+      <div class="status-detail" id="statusDetail">Loading…</div>
+    </div>
+
+    <label for="preset">Export label (live session)</label>
+    <select id="preset" aria-label="Export retention label">
+      <option value="1h">1 hour</option>
+      <option value="24h" selected>24 hours</option>
+      <option value="7d">7 days</option>
+      <option value="30d">30 days</option>
+    </select>
+
+    <button id="start" class="primary" type="button">Online Discovery</button>
+    <div class="row">
+      <button id="stop" type="button">Stop &amp; list</button>
+      <button id="clear" class="danger" type="button">Clear local log</button>
+    </div>
+
+    <pre id="out" hidden></pre>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "@skill-factory/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "node --watch --import tsx src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "smoke:intent": "tsx scripts/smoke-intent-phase3.ts"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@skill-factory/shared": "*",
+    "fastify": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

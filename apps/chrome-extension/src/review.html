@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Skill Factory — Harness Generation</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: system-ui, -apple-system, sans-serif;
+        max-width: 920px;
+        margin: 0 auto;
+        padding: 24px 20px 40px;
+        color: #171717;
+        background: #fafafa;
+        line-height: 1.45;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 1.25rem;
+        font-weight: 600;
+      }
+      .lead {
+        margin: 0 0 20px;
+        font-size: 0.875rem;
+        color: #525252;
+        max-width: 68ch;
+      }
+      .stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 20px;
+        margin-bottom: 16px;
+        font-size: 0.8125rem;
+        color: #404040;
+      }
+      .stats strong {
+        color: #171717;
+      }
+      label {
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #404040;
+        margin-bottom: 6px;
+      }
+      select {
+        min-width: 200px;
+        padding: 8px 10px;
+        font-size: 0.875rem;
+        border: 1px solid #d4d4d4;
+        border-radius: 6px;
+        background: #fff;
+        margin-bottom: 16px;
+      }
+      .table-wrap {
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        background: #fff;
+        max-height: 420px;
+        overflow: auto;
+        margin-bottom: 20px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+      th,
+      td {
+        padding: 8px 10px;
+        text-align: left;
+        border-bottom: 1px solid #f4f4f5;
+        vertical-align: top;
+      }
+      th {
+        position: sticky;
+        top: 0;
+        background: #f4f4f5;
+        font-weight: 600;
+        color: #3f3f46;
+        z-index: 1;
+      }
+      td {
+        word-break: break-word;
+      }
+      .mono {
+        font-family: ui-monospace, monospace;
+        font-size: 0.7rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      button {
+        padding: 10px 16px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid #d4d4d4;
+        background: #fff;
+      }
+      button.primary {
+        background: #2563eb;
+        border-color: #1d4ed8;
+        color: #fff;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .hint {
+        font-size: 0.8125rem;
+        color: #737373;
+        margin-top: 12px;
+      }
+      #result {
+        margin-top: 16px;
+        padding: 12px;
+        background: #fff;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+        display: none;
+      }
+      #result.visible {
+        display: block;
+      }
+      .empty {
+        padding: 24px;
+        text-align: center;
+        color: #737373;
+        font-size: 0.875rem;
+      }
+      .exclude-panel {
+        margin-bottom: 16px;
+        padding: 12px 14px;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 0.8125rem;
+      }
+      .exclude-panel legend {
+        font-weight: 600;
+        color: #171717;
+        padding: 0 4px;
+      }
+      .exclude-panel .exclude-hint {
+        margin: 0 0 10px;
+        font-size: 0.75rem;
+        font-weight: 400;
+        color: #737373;
+      }
+      .exclude-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .exclude-list label {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        margin: 0;
+        font-weight: 400;
+        cursor: pointer;
+        color: #404040;
+      }
+      .exclude-list input {
+        margin-top: 2px;
+        flex-shrink: 0;
+      }
+      tr.row-excluded td {
+        opacity: 0.45;
+        text-decoration: line-through;
+        text-decoration-color: #a1a1aa;
+      }
+      tr.row-excluded td:first-child {
+        text-decoration: none;
+        opacity: 1;
+      }
+      .intent-panel {
+        margin-top: 20px;
+        padding: 14px 16px;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        background: #fff;
+      }
+      .intent-panel h2 {
+        margin: 0 0 6px;
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #171717;
+      }
+      .intent-sub {
+        margin: 0 0 14px;
+        font-size: 0.75rem;
+        color: #737373;
+        line-height: 1.4;
+      }
+      .intent-site {
+        border-top: 1px solid #f4f4f5;
+        padding: 12px 0;
+      }
+      .intent-site:first-of-type {
+        border-top: none;
+        padding-top: 0;
+      }
+      .intent-site-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 8px 12px;
+        margin-bottom: 6px;
+      }
+      .intent-rank {
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #525252;
+        min-width: 2ch;
+      }
+      .intent-site-url {
+        font-size: 0.78rem;
+        font-family: ui-monospace, monospace;
+        word-break: break-all;
+      }
+      .intent-site-url a {
+        color: #2563eb;
+      }
+      .intent-summary {
+        font-size: 0.72rem;
+        color: #525252;
+        margin: 0 0 8px;
+        line-height: 1.45;
+      }
+      .intent-fn-list {
+        margin: 0;
+        padding-left: 1.1rem;
+        font-size: 0.72rem;
+        color: #404040;
+      }
+      .intent-fn-list li {
+        margin-bottom: 8px;
+      }
+      .intent-fn-name {
+        font-weight: 600;
+        color: #171717;
+      }
+      .intent-fn-desc {
+        display: block;
+        margin-top: 2px;
+        color: #525252;
+      }
+      .intent-fn-link {
+        display: inline-block;
+        margin-top: 4px;
+        font-family: ui-monospace, monospace;
+        font-size: 0.68rem;
+        color: #2563eb;
+      }
+      .intent-no-fn {
+        margin: 0;
+        font-size: 0.72rem;
+        font-style: italic;
+        color: #a1a1aa;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Review trace before Harness Generation</h1>
+    <p class="lead">
+      Last history import. Queries stripped on send/download. Check <strong>Private sites</strong> below to drop
+      whole origins before Send or Download.
+    </p>
+
+    <div class="stats" id="stats" aria-live="polite"></div>
+
+    <div>
+      <label for="exportPreset">Export label</label>
+      <select id="exportPreset" aria-label="Retention label">
+        <option value="1h">1 hour</option>
+        <option value="24h" selected>24 hours</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
+      </select>
+    </div>
+
+    <fieldset class="exclude-panel" id="excludePanel" hidden>
+      <legend>Private sites</legend>
+      <p class="exclude-hint">Checked origins are excluded from Send and Download.</p>
+      <div class="exclude-list" id="excludeOriginsList"></div>
+    </fieldset>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>Origin / path</th>
+            <th>Dwell</th>
+            <th>When</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div id="emptyState" class="empty" hidden>No rows. Import or record live in the popup, then reopen this page.</div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="primary" id="btnSend" disabled>Send to Skill Factory</button>
+      <button type="button" id="btnDownload" disabled>Download JSON</button>
+    </div>
+    <p class="hint">
+      Send → <span class="mono">POST /v1/pipeline/capture</span>. Download is local only.
+    </p>
+
+    <pre id="result" class="mono"></pre>
+
+    <section class="intent-panel" id="intentPanel" hidden aria-labelledby="intentHeading">
+      <h2 id="intentHeading">Intent analysis</h2>
+      <p class="intent-sub">
+        Shown after <strong>Send to Skill Factory</strong> for the payload that was just sent. Same heuristic as the API:
+        top sites from visits + dwell; interested functions only when <strong>history</strong> rows include a
+        <strong>?query</strong>. Changing private-site exclusions clears this until you send again.
+      </p>
+      <div id="intentPanelBody"></div>
+    </section>
+
+    <script type="module" src="review.js"></script>
+  </body>
+</html>

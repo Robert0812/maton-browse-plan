@@ -2,7 +2,7 @@
   "name": "maton-browse-plan",
   "private": true,
   "version": "0.2.0",
-  "description": "maton-browse-plan monorepo: Chrome extension (browsing capture + matonPlan JSON) and ClawHub API Gateway browse skill. Legacy Skill Factory code is under archive/.",
+  "description": "maton-browse-plan monorepo: Chrome extension (browsing capture + matonPlan JSON) and ClawHub API Gateway browse skill.",
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",

@@ -2,8 +2,6 @@
 
 Capture **Chrome history + live visits**, cluster top origins, and export **`matonPlan`** JSON so an agent using the **ClawHub API Gateway** skill ([byungkyu/api-gateway](https://clawhub.ai/byungkyu/api-gateway)) can prioritize **Maton** ([maton.ai](https://www.maton.ai/)) OAuth connections and API calls from real browsing—without the old Skill Factory LLM harness pipeline.
 
-Use this name for the GitHub repository and your local clone so paths match (for example the relay **Copy start command** uses `cd /path/to/maton-browse-plan`).
-
 ## Layout
 
 | Path | Role |
@@ -11,7 +9,6 @@ Use this name for the GitHub repository and your local clone so paths match (for
 | `apps/chrome-extension` | MV3 extension: history import, live capture, **Review** page, download `{ events, matonPlan, … }`. |
 | `skills/clawhub-api-gateway-browse` | **Extended ClawHub skill**: `SKILL.md` + `maton-plan.schema.json` for agents. |
 | `apps/mcp-skill-host` | Optional stdio MCP host (`@maton-browse-plan/mcp-skill-host`). |
-| `archive/` | **Legacy** Skill Factory HTTP API, harness sync MCP, and `@skill-factory/shared` (see `archive/README.md`). |
 
 ## Quick start
 

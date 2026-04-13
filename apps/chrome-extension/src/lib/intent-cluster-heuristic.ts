@@ -1,5 +1,5 @@
 /**
- * Mirrors `archive/skill-factory-api/src/intent/heuristic-cluster.ts` so the review page can show Phase 3 locally.
+ * Heuristic intent clustering for the review page Phase 3 (local, no server).
  */
 import type { TraceEvent } from "./types.js";
 

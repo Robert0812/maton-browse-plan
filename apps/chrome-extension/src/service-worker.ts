@@ -1,12 +1,21 @@
-import type { CapturePreset, TraceEvent } from "./lib/types.js";
-import { isCapturableUrl } from "./lib/sanitize.js";
+import { runHistoryRescanAndRelayIngest } from "./lib/capture-pipeline.js";
+import { mergeHistoryAndLive } from "./lib/merge-events.js";
+import { getRelayPortFromSettings } from "./lib/relay-client.js";
 import { migrateLegacyIfPresent } from "./lib/migrate-legacy.js";
-import { presetToStartMs } from "./lib/time-range.js";
+import { isCapturableUrl } from "./lib/sanitize.js";
 import {
   EVENTS_HISTORY_KEY,
   EVENTS_LIVE_KEY,
   LEGACY_EVENTS_KEY,
+  MATON_RELAY_REFRESH_ALARM,
+  SF_CAPTURE_PRESET_KEY,
+  SF_LAST_INGEST_STATS_KEY,
+  SF_LAST_RELAY_PUSH_AT_KEY,
+  SF_RELAY_REFRESH_PRESET_KEY,
+  SF_RELAY_SESSION_ACTIVE_KEY,
 } from "./lib/storage-keys.js";
+import { presetToStartMs, relayRefreshPresetToPeriodMs } from "./lib/time-range.js";
+import type { CapturePreset, LastIngestStats, RelayRefreshPreset, TraceEvent } from "./lib/types.js";
 
 function countHistoryRowsInWindow(events: TraceEvent[], preset: CapturePreset): number {
   const startMs = presetToStartMs(preset);
@@ -39,12 +48,6 @@ async function appendLiveEvent(ev: TraceEvent): Promise<void> {
   const all = await loadLiveEvents();
   all.push(ev);
   await chrome.storage.local.set({ [EVENTS_LIVE_KEY]: all });
-}
-
-function mergeForHarness(h: TraceEvent[], l: TraceEvent[]): TraceEvent[] {
-  return [...h, ...l].sort(
-    (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
-  );
 }
 
 /** Store-distributed builds set `update_url`; unpacked dev loads usually omit it. */
@@ -99,12 +102,12 @@ async function syncLiveRecordingBadge(): Promise<void> {
       await chrome.action.setBadgeText({ text: "●" });
       await chrome.action.setBadgeBackgroundColor({ color: "#15803d" });
       await chrome.action.setTitle({
-        title: "Skill Factory · Live recording ON — click for details",
+        title: "Maton browse plan · Live recording ON — click for details",
       });
     } else {
       await chrome.action.setBadgeText({ text: "" });
       await chrome.action.setTitle({
-        title: "Skill Factory · Live recording OFF",
+        title: "Maton browse plan · Live recording OFF",
       });
     }
   } catch {
@@ -170,15 +173,39 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       }
       case "GET_STATUS": {
         const active = await isCaptureActive();
-        const preset = (await chrome.storage.local.get("sf_capture_preset")).sf_capture_preset as
-          | CapturePreset
-          | undefined;
+        const stored = await chrome.storage.local.get([
+          SF_CAPTURE_PRESET_KEY,
+          SF_RELAY_SESSION_ACTIVE_KEY,
+          SF_LAST_RELAY_PUSH_AT_KEY,
+          SF_RELAY_REFRESH_PRESET_KEY,
+          SF_LAST_INGEST_STATS_KEY,
+        ]);
+        const preset = stored[SF_CAPTURE_PRESET_KEY] as CapturePreset | undefined;
+        const historyWindowPreset = preset ?? "3d";
+        const relaySessionActive = stored[SF_RELAY_SESSION_ACTIVE_KEY] === true;
+        const relayRefreshPreset = (stored[SF_RELAY_REFRESH_PRESET_KEY] as RelayRefreshPreset | undefined) ?? "3h";
+        const lastRelayPushAt =
+          typeof stored[SF_LAST_RELAY_PUSH_AT_KEY] === "string" ? stored[SF_LAST_RELAY_PUSH_AT_KEY] : null;
+        const rawIngest = stored[SF_LAST_INGEST_STATS_KEY];
+        const lastIngestStats: LastIngestStats | null =
+          rawIngest &&
+          typeof rawIngest === "object" &&
+          rawIngest !== null &&
+          typeof (rawIngest as LastIngestStats).eventCount === "number"
+            ? (rawIngest as LastIngestStats)
+            : null;
+        const periodMs = relayRefreshPresetToPeriodMs(relayRefreshPreset);
+        let nextRelayRefreshAt: number | null = null;
+        if (relaySessionActive && lastRelayPushAt) {
+          const t = Date.parse(lastRelayPushAt);
+          if (!Number.isNaN(t)) nextRelayRefreshAt = t + periodMs;
+        }
         const liveEvents = await loadLiveEvents();
         const historyEvents = await loadHistoryEvents();
         const liveCount = liveEvents.length;
         const historyCountTotal = historyEvents.length;
         const historyStatsPreset =
-          (message?.historyStatsPreset as CapturePreset | undefined) ?? undefined;
+          (message?.historyStatsPreset as CapturePreset | undefined) ?? historyWindowPreset;
         const historyCountInRange = historyStatsPreset
           ? countHistoryRowsInWindow(historyEvents, historyStatsPreset)
           : historyCountTotal;
@@ -203,7 +230,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({
           ok: true,
           active,
-          preset: preset ?? "24h",
+          preset: historyWindowPreset,
+          relaySessionActive,
+          relayRefreshPreset,
+          lastRelayPushAt,
+          nextRelayRefreshAt,
+          lastIngestStats,
           liveCount,
           historyCountTotal,
           historyCountInRange,
@@ -215,7 +247,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case "START_CAPTURE": {
         await chrome.storage.local.set({
           sf_capture_active: true,
-          sf_capture_preset: message.preset as CapturePreset,
+          [SF_CAPTURE_PRESET_KEY]: message.preset as CapturePreset,
         });
         await chrome.storage.session.remove(SESSION_STATE_KEY);
         const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -245,31 +277,41 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case "GET_EVENTS": {
-        const events = mergeForHarness(await loadHistoryEvents(), await loadLiveEvents());
+        const events = mergeHistoryAndLive(await loadHistoryEvents(), await loadLiveEvents());
         sendResponse({ ok: true, events });
         break;
       }
       case "GET_HARNESS_REVIEW_DATA": {
         const historyEvents = await loadHistoryEvents();
         const liveEvents = await loadLiveEvents();
-        const events = mergeForHarness(historyEvents, liveEvents);
-        const { sf_capture_preset: p } = await chrome.storage.local.get("sf_capture_preset");
+        const events = mergeHistoryAndLive(historyEvents, liveEvents);
+        const { [SF_CAPTURE_PRESET_KEY]: p } = await chrome.storage.local.get(SF_CAPTURE_PRESET_KEY);
         sendResponse({
           ok: true,
           events,
-          preset: (p as CapturePreset) ?? "24h",
+          preset: (p as CapturePreset) ?? "3d",
           liveCount: liveEvents.length,
           historyCount: historyEvents.length,
         });
         break;
       }
       case "CLEAR_EVENTS": {
+        const now = Date.now();
+        const state = await loadSegmentState();
+        if (await isCaptureActive() && state.lastActiveTabId != null) {
+          await finalizeTabSegment(state, state.lastActiveTabId, now, "capture_stop");
+        }
+        await saveSegmentState({ lastActiveTabId: null, tabSegments: {} });
+        await chrome.alarms.clear(MATON_RELAY_REFRESH_ALARM);
         await chrome.storage.local.set({
+          sf_capture_active: false,
           [EVENTS_LIVE_KEY]: [],
           [EVENTS_HISTORY_KEY]: [],
+          [SF_RELAY_SESSION_ACTIVE_KEY]: false,
         });
-        await chrome.storage.local.remove(LEGACY_EVENTS_KEY);
+        await chrome.storage.local.remove([LEGACY_EVENTS_KEY, SF_LAST_RELAY_PUSH_AT_KEY, SF_LAST_INGEST_STATS_KEY]);
         await chrome.storage.session.remove(SESSION_STATE_KEY);
+        await syncLiveRecordingBadge();
         sendResponse({ ok: true });
         break;
       }
@@ -278,6 +320,37 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
   })();
   return true;
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name !== MATON_RELAY_REFRESH_ALARM) return;
+  void (async () => {
+    await storageInitDone;
+    try {
+      const { [SF_RELAY_SESSION_ACTIVE_KEY]: active, [SF_CAPTURE_PRESET_KEY]: preset } =
+        await chrome.storage.local.get([SF_RELAY_SESSION_ACTIVE_KEY, SF_CAPTURE_PRESET_KEY]);
+      if (active !== true) return;
+      const p = (preset as CapturePreset | undefined) ?? "3d";
+      const result = await runHistoryRescanAndRelayIngest(p);
+      if (result.ok) {
+        const relayPort = await getRelayPortFromSettings();
+        const stats: LastIngestStats = {
+          eventCount: result.eventCount,
+          skipped: result.skipped,
+          siteCount: result.siteCount,
+          relayPort,
+        };
+        await chrome.storage.local.set({
+          [SF_LAST_RELAY_PUSH_AT_KEY]: new Date().toISOString(),
+          [SF_LAST_INGEST_STATS_KEY]: stats,
+        });
+      } else {
+        console.warn("[maton-browse] relay refresh failed", result.detail);
+      }
+    } catch (e) {
+      console.error("[maton-browse] relay alarm failed", e);
+    }
+  })();
 });
 
 chrome.runtime.onInstalled.addListener(() => {

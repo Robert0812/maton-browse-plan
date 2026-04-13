@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Skill Factory — Harness Generation</title>
+    <title>Maton browse plan — Review export</title>
     <style>
       * {
         box-sizing: border-box;
@@ -247,13 +247,81 @@
         font-style: italic;
         color: #a1a1aa;
       }
+      .relay-panel {
+        margin-bottom: 18px;
+        padding: 14px 16px;
+        border: 1px solid #e5e5e5;
+        border-radius: 8px;
+        background: #fff;
+        font-size: 0.8125rem;
+      }
+      .relay-panel h2 {
+        margin: 0 0 8px;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      .relay-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+        margin-bottom: 10px;
+      }
+      .relay-row:last-child {
+        margin-bottom: 0;
+      }
+      .relay-row label.inline {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0;
+        font-weight: 500;
+        cursor: pointer;
+      }
+      .relay-row input[type="text"],
+      .relay-row input[type="password"] {
+        flex: 1 1 220px;
+        min-width: 180px;
+        padding: 8px 10px;
+        font-size: 0.8125rem;
+        border: 1px solid #d4d4d4;
+        border-radius: 6px;
+      }
+      .relay-status {
+        font-size: 0.75rem;
+        color: #737373;
+        margin-top: 8px;
+      }
+      .relay-status.err {
+        color: #b91c1c;
+      }
+      .relay-status.ok {
+        color: #15803d;
+      }
+      .relay-badge {
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 4px 8px;
+        border-radius: 6px;
+        background: #f4f4f5;
+        color: #525252;
+      }
+      .relay-badge.ok {
+        background: #ecfdf5;
+        color: #15803d;
+      }
+      .relay-badge.err {
+        background: #fef2f2;
+        color: #b91c1c;
+      }
     </style>
   </head>
   <body>
-    <h1>Review trace before Harness Generation</h1>
+    <h1>Review trace · Maton plan export</h1>
     <p class="lead">
-      Last history import. Queries stripped on send/download. Use <strong>Exclude</strong> in the table to drop whole
-      origins before Send or Download.
+      Exclude whole origins, then <strong>Download JSON</strong>. The file includes <code>matonPlan</code> (connector hints for
+      <a href="https://clawhub.ai/byungkyu/api-gateway" target="_blank" rel="noopener noreferrer">ClawHub API Gateway</a> /
+      <a href="https://www.maton.ai/" target="_blank" rel="noopener noreferrer">Maton</a>) plus raw events.
     </p>
 
     <div class="stats" id="stats" aria-live="polite"></div>
@@ -262,18 +330,55 @@
       <label for="exportPreset">Export label</label>
       <select id="exportPreset" aria-label="Retention label">
         <option value="1h">1 hour</option>
-        <option value="24h" selected>24 hours</option>
+        <option value="24h">24 hours</option>
+        <option value="3d" selected>3 days</option>
         <option value="7d">7 days</option>
         <option value="30d">30 days</option>
       </select>
     </div>
+
+    <section class="relay-panel" aria-labelledby="relayHeading">
+      <h2 id="relayHeading">Local relay</h2>
+      <p class="hint" style="margin-top: 0">
+        The relay is a small process on your machine (not inside Chrome). Extensions cannot start or stop local servers, so
+        use <strong>Copy start command</strong> and run it in a terminal, then <strong>Refresh status</strong>. Agents read
+        <span class="mono">GET /latest</span> on loopback. The published Web Store build only allows relay base URLs on
+        <strong>localhost</strong> / <strong>127.0.0.1</strong> / <strong>::1</strong> (not LAN or remote hosts).
+      </p>
+      <div class="relay-row">
+        <label class="inline"
+          ><input type="checkbox" id="relayEnabled" />
+          Push JSON to relay when downloading</label
+        >
+      </div>
+      <div class="relay-row">
+        <label for="relayBaseUrl">Base URL</label>
+        <input type="text" id="relayBaseUrl" spellcheck="false" autocomplete="off" />
+      </div>
+      <div class="relay-row">
+        <label for="relayToken">Bearer token</label>
+        <input
+          type="password"
+          id="relayToken"
+          placeholder="optional (match MATON_RELAY_TOKEN)"
+          spellcheck="false"
+          autocomplete="off"
+        />
+      </div>
+      <div class="relay-row" style="align-items: center">
+        <span class="relay-badge" id="relayBadge" aria-live="polite">Relay: …</span>
+        <button type="button" id="btnRelayCopyCmd">Copy start command</button>
+        <button type="button" id="btnRelayTest">Refresh status</button>
+      </div>
+      <div class="relay-status" id="relayStatus" aria-live="polite"></div>
+    </section>
 
     <div class="table-wrap">
       <table>
         <thead>
           <tr>
             <th class="col-exclude" scope="col">
-              <abbr title="Exclude entire origin from Send and Download">Exclude</abbr>
+              <abbr title="Exclude entire origin from export">Exclude</abbr>
             </th>
             <th scope="col">Source</th>
             <th scope="col">Origin / path</th>
@@ -287,21 +392,19 @@
     </div>
 
     <div class="actions">
-      <button type="button" class="primary" id="btnSend" disabled>Send to Skill Factory</button>
-      <button type="button" id="btnDownload" disabled>Download JSON</button>
+      <button type="button" class="primary" id="btnDownload" disabled>Download JSON</button>
     </div>
     <p class="hint">
-      Send → <span class="mono">POST /v1/pipeline/capture</span>. Download is local only.
+      Install the companion skill from <span class="mono">skills/clawhub-api-gateway-browse/</span> on ClawHub (or load locally). The optional local relay is only for live handoff to tools on this machine.
     </p>
 
     <pre id="result" class="mono"></pre>
 
     <section class="intent-panel" id="intentPanel" hidden aria-labelledby="intentHeading">
-      <h2 id="intentHeading">Intent analysis</h2>
+      <h2 id="intentHeading">Cluster preview</h2>
       <p class="intent-sub">
-        Shown after <strong>Send to Skill Factory</strong> for the payload that was just sent. Same heuristic as the API:
-        top sites from visits + dwell; interested functions only when <strong>history</strong> rows include a
-        <strong>?query</strong>. Changing exclusions in the table clears this until you send again.
+        Same heuristics as <code>matonPlan</code>: top origins by visits + dwell; “functions” only when history URLs carry a
+        query string. Updates when exclusions change.
       </p>
       <div id="intentPanelBody"></div>
     </section>

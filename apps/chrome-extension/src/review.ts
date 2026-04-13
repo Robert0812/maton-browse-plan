@@ -1,6 +1,14 @@
-import { skillFactoryApiBase } from "./config.js";
 import { buildIntentCluster } from "./lib/intent-cluster-heuristic.js";
-import { batchForCaptureApi, sanitizeBatch } from "./lib/sanitize.js";
+import { buildMatonBrowseDerivedPlan } from "./lib/maton-plan.js";
+import {
+  DEFAULT_RELAY_BASE_URL,
+  RELAY_START_COMMAND_SNIPPET,
+  fetchRelayHealth,
+  loadRelaySettings,
+  postRelayIngest,
+  saveRelaySettings,
+} from "./lib/relay-client.js";
+import { sanitizeBatch } from "./lib/sanitize.js";
 import type { CapturePayload, CapturePreset, TraceEvent } from "./lib/types.js";
 
 const statsEl = document.getElementById("stats") as HTMLDivElement;
@@ -9,16 +17,21 @@ const emptyState = document.getElementById("emptyState") as HTMLDivElement;
 const intentPanel = document.getElementById("intentPanel") as HTMLElement;
 const intentPanelBody = document.getElementById("intentPanelBody") as HTMLDivElement;
 const exportPreset = document.getElementById("exportPreset") as HTMLSelectElement;
-const btnSend = document.getElementById("btnSend") as HTMLButtonElement;
 const btnDownload = document.getElementById("btnDownload") as HTMLButtonElement;
 const result = document.getElementById("result") as HTMLPreElement;
+const relayEnabled = document.getElementById("relayEnabled") as HTMLInputElement;
+const relayBaseUrl = document.getElementById("relayBaseUrl") as HTMLInputElement;
+const relayToken = document.getElementById("relayToken") as HTMLInputElement;
+const btnRelayCopyCmd = document.getElementById("btnRelayCopyCmd") as HTMLButtonElement;
+const btnRelayTest = document.getElementById("btnRelayTest") as HTMLButtonElement;
+const relayBadge = document.getElementById("relayBadge") as HTMLSpanElement;
+const relayStatus = document.getElementById("relayStatus") as HTMLDivElement;
 
 const MAX_ROWS = 200;
 
 let rawEvents: TraceEvent[] = [];
 let liveCount = 0;
 let historyCount = 0;
-/** Origins omitted from Send / Download when checked. */
 const excludedOrigins = new Set<string>();
 
 function showResult(text: string): void {
@@ -36,11 +49,6 @@ function formatWhen(iso: string): string {
 
 function getFilteredEvents(): TraceEvent[] {
   return sanitizeBatch(rawEvents).filter((ev) => !excludedOrigins.has(ev.origin));
-}
-
-/** Send payload: same exclusions as review table, queries preserved for server-side intent clustering. */
-function getFilteredEventsForApiSend(): TraceEvent[] {
-  return batchForCaptureApi(rawEvents).filter((ev) => !excludedOrigins.has(ev.origin));
 }
 
 function exportEventCount(): number {
@@ -75,7 +83,6 @@ function hideIntentPanel(): void {
   intentPanelBody.replaceChildren();
 }
 
-/** Local Phase 3 for a concrete event list (used after Send with the payload that was posted). */
 function showIntentClusterForEvents(events: TraceEvent[]): void {
   intentPanelBody.replaceChildren();
   if (events.length === 0) {
@@ -146,9 +153,12 @@ function updateExportDependentUi(): void {
     if (cb) cb.checked = excluded;
   });
   const canExport = rawEvents.length > 0 && exportEventCount() > 0;
-  btnSend.disabled = !canExport;
   btnDownload.disabled = !canExport;
-  hideIntentPanel();
+  if (canExport) {
+    showIntentClusterForEvents(getFilteredEvents());
+  } else {
+    hideIntentPanel();
+  }
 }
 
 async function load(): Promise<void> {
@@ -206,8 +216,8 @@ async function load(): Promise<void> {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.className = "exclude-origin-cb";
-    cb.title = `Exclude ${ev.origin} from Send and Download`;
-    cb.setAttribute("aria-label", `Exclude origin ${ev.origin} from Send and Download`);
+    cb.title = `Exclude ${ev.origin} from export`;
+    cb.setAttribute("aria-label", `Exclude origin ${ev.origin} from export`);
     cb.checked = excludedOrigins.has(ev.origin);
     cb.addEventListener("change", () => {
       if (cb.checked) excludedOrigins.add(ev.origin);
@@ -249,66 +259,131 @@ async function load(): Promise<void> {
 }
 
 function buildPayload(): CapturePayload {
+  const events = getFilteredEvents();
+  const exportedAt = new Date().toISOString();
+  const { sites } = buildIntentCluster(events);
+  const matonPlan = buildMatonBrowseDerivedPlan(sites, exportedAt, exportPreset.value);
   return {
     preset: exportPreset.value as CapturePreset,
-    events: getFilteredEvents(),
-    exportedAt: new Date().toISOString(),
+    events,
+    exportedAt,
+    matonPlan,
   };
 }
 
 btnDownload.addEventListener("click", () => {
-  if (rawEvents.length === 0 || exportEventCount() === 0) return;
-  const payload = buildPayload();
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `skill-factory-capture-${payload.exportedAt.slice(0, 19)}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showResult("Download started.");
-});
+  void (async () => {
+    if (rawEvents.length === 0 || exportEventCount() === 0) return;
+    const payload = buildPayload();
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `maton-browse-capture-${payload.exportedAt.slice(0, 19)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
 
-btnSend.addEventListener("click", async () => {
-  if (rawEvents.length === 0 || exportEventCount() === 0) return;
-  const preset = exportPreset.value as CapturePreset;
-  const events = getFilteredEventsForApiSend();
-  const base = skillFactoryApiBase();
-  const captureUrl = `${base}/v1/pipeline/capture`;
-  btnSend.disabled = true;
-  try {
-    const r = await fetch(captureUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userId: "chrome-extension",
-        window: { preset },
-        exportedAt: new Date().toISOString(),
-        events,
-      }),
+    const baseUrl = relayBaseUrl.value.trim() || DEFAULT_RELAY_BASE_URL;
+    await saveRelaySettings({
+      enabled: relayEnabled.checked,
+      baseUrl,
+      token: relayToken.value,
     });
-    const text = await r.text();
-    let json: unknown;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = text;
+
+    const lines: string[] = [
+      "Download started. Feed matonPlan to the ClawHub API Gateway · Browse skill (see repo skills/clawhub-api-gateway-browse).",
+    ];
+    if (relayEnabled.checked) {
+      const r = await postRelayIngest(baseUrl, relayToken.value.trim() || undefined, payload);
+      if (r.ok) {
+        lines.push("Local relay: ingest OK — use GET /latest on the same base URL (e.g. for MCP or scripts).");
+      } else {
+        lines.push(`Local relay: ingest failed — ${r.detail ?? "error"}`);
+      }
     }
-    showResult(JSON.stringify({ ok: r.ok, status: r.status, body: json }, null, 2));
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    showResult(
-      [
-        `Request failed: ${msg}`,
-        `URL: ${captureUrl}`,
-        'If this is "Failed to fetch": start the API (`node apps/skill-factory-api/dist/index.js`), ensure the port matches `src/config.ts`, then reload this extension on chrome://extensions.',
-        "Private-network preflight: API must return Access-Control-Allow-Private-Network (rebuild API after pull).",
-      ].join("\n"),
-    );
-  } finally {
-    updateExportDependentUi();
-    showIntentClusterForEvents(events);
-  }
+    showResult(lines.join("\n\n"));
+  })();
 });
 
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand("copy");
+      document.body.removeChild(ta);
+      return ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+function setRelayBadge(mode: "ok" | "err" | "neutral", label: string): void {
+  relayBadge.textContent = label;
+  relayBadge.className = "relay-badge" + (mode === "ok" ? " ok" : mode === "err" ? " err" : "");
+}
+
+async function refreshRelayStatus(): Promise<void> {
+  setRelayBadge("neutral", "Relay: checking…");
+  relayStatus.textContent = "";
+  relayStatus.className = "relay-status";
+  const url = relayBaseUrl.value.trim() || DEFAULT_RELAY_BASE_URL;
+  const r = await fetchRelayHealth(url);
+  if (r.ok) {
+    setRelayBadge("ok", "Relay: running");
+    relayStatus.textContent = `${url} — GET /health OK. Stop with Ctrl+C in that terminal.`;
+    relayStatus.className = "relay-status ok";
+  } else {
+    setRelayBadge("err", "Relay: not running");
+    relayStatus.textContent = `No response at ${url} — ${r.detail ?? "unknown"}. Copy start command, run in a terminal, then refresh.`;
+    relayStatus.className = "relay-status err";
+  }
+}
+
+async function initRelayPanel(): Promise<void> {
+  const s = await loadRelaySettings();
+  relayEnabled.checked = s.enabled;
+  relayBaseUrl.value = s.baseUrl;
+  relayToken.value = s.token;
+
+  relayEnabled.addEventListener("change", () => {
+    void saveRelaySettings({ enabled: relayEnabled.checked });
+  });
+  relayBaseUrl.addEventListener("blur", () => {
+    void saveRelaySettings({ baseUrl: relayBaseUrl.value.trim() || DEFAULT_RELAY_BASE_URL });
+    void refreshRelayStatus();
+  });
+  relayToken.addEventListener("blur", () => {
+    void saveRelaySettings({ token: relayToken.value });
+  });
+
+  btnRelayCopyCmd.addEventListener("click", () => {
+    void (async () => {
+      const ok = await copyToClipboard(RELAY_START_COMMAND_SNIPPET);
+      if (ok) {
+        relayStatus.textContent = "Copied — edit the cd path to your clone, run in Terminal, then Refresh status.";
+        relayStatus.className = "relay-status ok";
+      } else {
+        relayStatus.textContent = "Could not copy to clipboard.";
+        relayStatus.className = "relay-status err";
+      }
+    })();
+  });
+
+  btnRelayTest.addEventListener("click", () => {
+    void refreshRelayStatus();
+  });
+
+  void refreshRelayStatus();
+}
+
+void initRelayPanel();
 void load();

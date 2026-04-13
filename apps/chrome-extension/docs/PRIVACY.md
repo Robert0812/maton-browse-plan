@@ -28,4 +28,4 @@ If you install the optional **native messaging host** from the same open-source 
 
 ## Contact
 
-Host this document at a public **HTTPS** URL and enter that URL in the Chrome Web Store listing (required for extensions with sensitive permissions). Replace this paragraph with your support email or project URL when you publish.
+Host this document at a public **HTTPS** URL and enter that URL in the Chrome Web Store listing (required for extensions with sensitive permissions). For questions about this privacy policy or the extension, contact **rzhao@link.cuhk.edu.hk**.

@@ -16,7 +16,7 @@ export function isAllowedRelayBaseUrl(input: string): boolean {
 }
 
 /** Clipboard text: user runs this in a terminal at the repo root (extension cannot start Node itself). */
-export const RELAY_START_COMMAND_SNIPPET = `cd /path/to/trace2harness
+export const RELAY_START_COMMAND_SNIPPET = `cd /path/to/maton-browse-plan
 npm run relay`;
 
 const STORAGE_ENABLED = "maton_relay_enabled";

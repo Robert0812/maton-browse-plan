@@ -34,7 +34,31 @@ function bucketByOrigin(events: TraceEvent[]): OriginBucket[] {
     else if (e.source === "live") b.score += Math.min(e.dwellMs, 600_000) / 3000 + 3;
     else b.score += 2;
   }
-  return [...map.values()].sort((a, b) => b.score - a.score).slice(0, MAX_ORIGINS);
+  const filtered = [...map.values()].filter(originPassesInterestGate);
+  return filtered.sort((a, b) => b.score - a.score).slice(0, MAX_ORIGINS);
+}
+
+/** Drop one-off noise (single history row with visitCount 1 and no meaningful live engagement). */
+function originPassesInterestGate(b: OriginBucket): boolean {
+  const history = b.events.filter((e) => e.source === "history");
+  const live = b.events.filter((e) => e.source === "live");
+  const historyVisitSum = history.reduce((s, e) => s + (e.visitCount ?? 1), 0);
+  const liveDwellSum = live.reduce((s, e) => s + Math.min(e.dwellMs ?? 0, 600_000), 0);
+  if (b.events.length >= 2) return true;
+  if (historyVisitSum >= 2) return true;
+  if (liveDwellSum >= 10_000) return true;
+  return false;
+}
+
+function formatInterestStats(b: OriginBucket): string {
+  const history = b.events.filter((e) => e.source === "history");
+  const live = b.events.filter((e) => e.source === "live");
+  const historyVisitSum = history.reduce((s, e) => s + (e.visitCount ?? 1), 0);
+  return [
+    `historyVisitSum≈${historyVisitSum}`,
+    `rows=${b.events.length} (${history.length} history / ${live.length} live)`,
+    `score≈${Math.round(b.score * 10) / 10}`,
+  ].join("; ");
 }
 
 /** History rows whose URL carries a real query string (intent functions come only from these). */
@@ -211,14 +235,16 @@ export function heuristicClusterFromEvents(events: TraceEvent[]): ClusteredInter
   const originBuckets = bucketByOrigin(events);
   return originBuckets.map((b, i) => {
     const functions = buildFunctionsForOrigin(b.events);
+    const interestStats = formatInterestStats(b);
     return {
       rank: i + 1,
       origin: b.origin,
       siteUrl: siteUrlForOriginBucket(b),
+      interestStats,
       summary:
         functions.length > 0
-          ? `Rank #${i + 1} by history visits + live dwell; ${functions.length} interested function(s) from query-bearing history (cap ${MAX_FUNCTIONS_PER_ORIGIN}).`
-          : `Rank #${i + 1} by history visits + live dwell; no query-bearing history for this origin — interested functions omitted.`,
+          ? `Rank #${i + 1} (${interestStats}). ${functions.length} interested function(s) from query-bearing history (cap ${MAX_FUNCTIONS_PER_ORIGIN}).`
+          : `Rank #${i + 1} (${interestStats}). No query-bearing history for this origin — interested functions omitted.`,
       functions,
     };
   });
@@ -226,4 +252,17 @@ export function heuristicClusterFromEvents(events: TraceEvent[]): ClusteredInter
 
 export function buildIntentCluster(events: TraceEvent[]): IntentClusterResult {
   return { source: "heuristic", sites: heuristicClusterFromEvents(events) };
+}
+
+/**
+ * Hard cap for Phase 4 LLM + published harness: top origins and sub-functions only.
+ * Use when session context may contain an oversized cluster from older clients.
+ */
+export function capIntentClusterForExploration(cluster: IntentClusterResult): IntentClusterResult {
+  const sites = cluster.sites.slice(0, MAX_ORIGINS).map((s, i) => ({
+    ...s,
+    rank: i + 1,
+    functions: s.functions.slice(0, MAX_FUNCTIONS_PER_ORIGIN),
+  }));
+  return { source: cluster.source, sites };
 }

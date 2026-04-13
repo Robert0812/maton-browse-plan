@@ -1,5 +1,6 @@
 import type {
   GoldenPath,
+  HarnessInstallerSpec,
   IntentClusterResult,
   IntentValidationState,
   McpSkillBundle,
@@ -12,6 +13,8 @@ export interface MvpPipelineContext {
   intent?: IntentValidationState;
   /** Phase 3 clustering output (sites + suggested functions). */
   intentCluster?: IntentClusterResult;
+  /** Phase 4 — LLM harness installer (last successful exploration). */
+  lastHarness?: HarnessInstallerSpec;
   lastPaths?: GoldenPath[];
   lastBundle?: McpSkillBundle;
 }

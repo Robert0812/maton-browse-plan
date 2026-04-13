@@ -125,7 +125,7 @@ const storageInitDone = (async () => {
     await wipeIfNewUnpackedBundle();
     await syncLiveRecordingBadge();
   } catch (e) {
-    console.error("[skill-factory] storage init failed", e);
+    console.error("[maton-browse-plan] storage init failed", e);
   }
 })();
 

@@ -1,12 +1,12 @@
 {
-  "name": "maton-browse-gateway-monorepo",
+  "name": "maton-browse-plan",
   "private": true,
   "version": "0.2.0",
-  "description": "Chrome extension: browsing capture + matonPlan JSON for Maton/ClawHub API Gateway. Extended skill in skills/clawhub-api-gateway-browse/. Legacy Skill Factory API is under archive/.",
+  "description": "maton-browse-plan monorepo: Chrome extension (browsing capture + matonPlan JSON) and ClawHub API Gateway browse skill. Legacy Skill Factory code is under archive/.",
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "relay": "npm run start --workspace=@skill-factory/maton-local-relay",
+    "relay": "npm run start --workspace=@maton-browse-plan/maton-local-relay",
     "install-native-host": "node apps/maton-native-host/scripts/install-native-host.mjs"
   },
   "engines": {

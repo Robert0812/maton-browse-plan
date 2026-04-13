@@ -1,6 +1,8 @@
-# Maton browse plan · Chrome extension
+# maton-browse-plan
 
 Capture **Chrome history + live visits**, cluster top origins, and export **`matonPlan`** JSON so an agent using the **ClawHub API Gateway** skill ([byungkyu/api-gateway](https://clawhub.ai/byungkyu/api-gateway)) can prioritize **Maton** ([maton.ai](https://www.maton.ai/)) OAuth connections and API calls from real browsing—without the old Skill Factory LLM harness pipeline.
+
+Use this name for the GitHub repository and your local clone so paths match (for example the relay **Copy start command** uses `cd /path/to/maton-browse-plan`).
 
 ## Layout
 
@@ -8,7 +10,7 @@ Capture **Chrome history + live visits**, cluster top origins, and export **`mat
 |------|------|
 | `apps/chrome-extension` | MV3 extension: history import, live capture, **Review** page, download `{ events, matonPlan, … }`. |
 | `skills/clawhub-api-gateway-browse` | **Extended ClawHub skill**: `SKILL.md` + `maton-plan.schema.json` for agents. |
-| `apps/mcp-skill-host` | Optional stdio MCP host (unchanged). |
+| `apps/mcp-skill-host` | Optional stdio MCP host (`@maton-browse-plan/mcp-skill-host`). |
 | `archive/` | **Legacy** Skill Factory HTTP API, harness sync MCP, and `@skill-factory/shared` (see `archive/README.md`). |
 
 ## Quick start
@@ -30,7 +32,7 @@ npm run build
 
 ```bash
 npm install
-npm run build --workspace=@skill-factory/chrome-extension
+npm run build --workspace=@maton-browse-plan/chrome-extension
 ```
 
 The loadable folder is **`apps/chrome-extension/dist`** (relative to the repo root; use its absolute path in Chrome’s folder picker).
@@ -46,7 +48,7 @@ The loadable folder is **`apps/chrome-extension/dist`** (relative to the repo ro
 
 **Handing data to an agent:** Use **Review → Download** JSON, **or** run the local relay (`npm run relay` from the repo root by default) and pair the extension’s relay settings with **`GET /latest`** on the relay base URL (see `skills/clawhub-api-gateway-browse/SKILL.md`).
 
-**Optional — relay start/stop from the popup:** Build the native host (`npm run build --workspace=@skill-factory/maton-native-host`), copy the **Extension ID** from `chrome://extensions`, then from the repo root run `EXTENSION_ID=<id> npm run install-native-host` and restart Chrome. Otherwise keep **`npm run relay`** running in a terminal and use manual relay settings.
+**Optional — relay start/stop from the popup:** Build the native host (`npm run build --workspace=@maton-browse-plan/maton-native-host`), copy the **Extension ID** from `chrome://extensions`, then from the repo root run `EXTENSION_ID=<id> npm run install-native-host` and restart Chrome. Otherwise keep **`npm run relay`** running in a terminal and use manual relay settings.
 
 ### ClawHub skill
 

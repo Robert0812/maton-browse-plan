@@ -1,10 +1,11 @@
 {
-  "name": "@maton-browse-plan/mcp-skill-host",
+  "name": "@skill-factory/mcp-harness-sync",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "description": "MCP skill: pull Skill Factory harness installer published by the Chrome extension (GET /v1/sync/harness-installer).",
   "bin": {
-    "mcp-skill-host": "./dist/index.js"
+    "mcp-harness-sync": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

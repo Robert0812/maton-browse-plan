@@ -31,7 +31,7 @@ export interface MatonOriginSuggestion {
 
 export interface MatonBrowseDerivedPlan {
   schemaVersion: typeof MATON_BROWSE_PLAN_VERSION;
-  source: "wondersagent-chrome-extension";
+  source: "maton-browse-plan-chrome-extension";
   /** Intended consumer: extended ClawHub API Gateway skill + Maton workspace. */
   skillTarget: "clawhub:byungkyu/api-gateway";
   matonProductUrl: "https://www.maton.ai/";
@@ -133,7 +133,7 @@ export function buildMatonBrowseDerivedPlan(
 
   return {
     schemaVersion: MATON_BROWSE_PLAN_VERSION,
-    source: "wondersagent-chrome-extension",
+    source: "maton-browse-plan-chrome-extension",
     skillTarget: "clawhub:byungkyu/api-gateway",
     matonProductUrl: "https://www.maton.ai/",
     generatedAt,

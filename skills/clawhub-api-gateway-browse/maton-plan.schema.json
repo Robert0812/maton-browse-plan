@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://wondersagent.dev/schemas/maton-plan/v1.json",
+  "$id": "https://maton-browse-plan/schema/maton-plan/v1.json",
   "title": "MatonBrowseDerivedPlan",
   "type": "object",
   "required": ["schemaVersion", "source", "skillTarget", "matonProductUrl", "generatedAt", "suggestions"],

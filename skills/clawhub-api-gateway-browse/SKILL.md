@@ -1,9 +1,9 @@
 ---
 name: api-gateway-browse-extension
-version: 1.2.2
+version: 1.2.4
 description: >-
   Guides the user through building and loading the Maton browse-capture Chrome extension from
-  the repository that contains apps/chrome-extension, then combines exported matonPlan JSON
+  the maton-browse-plan repository (apps/chrome-extension), then combines exported matonPlan JSON
   with the API Gateway skill to suggest Maton OAuth connectors from real browsing; fetches
   matonPlan via the local relay GET /latest when the relay is running.
 license: MIT-0
@@ -26,7 +26,7 @@ The extension is **only** shipped as source in **`apps/chrome-extension`** (not 
 
 ```bash
 npm install
-npm run build --workspace=@skill-factory/chrome-extension
+npm run build --workspace=@maton-browse-plan/chrome-extension
 ```
 
 **2. Load unpacked** — tell the user to:
@@ -40,7 +40,7 @@ npm run build --workspace=@skill-factory/chrome-extension
 
 **4. Get JSON to the agent** — Either **Review → Download** in the extension, **or** run **`npm run relay`** from the repo root and use the **`GET /latest`** flow described in **Local relay** (below).
 
-**Optional — start/stop relay from the extension popup:** Build **`npm run build --workspace=@skill-factory/maton-native-host`**, copy the **Extension ID** from `chrome://extensions`, then **`EXTENSION_ID=<id> npm run install-native-host`** from the repo root and restart Chrome. If they skip native messaging, they can keep **`npm run relay`** in a terminal and configure relay manually.
+**Optional — start/stop relay from the extension popup:** Build **`npm run build --workspace=@maton-browse-plan/maton-native-host`**, copy the **Extension ID** from `chrome://extensions`, then **`EXTENSION_ID=<id> npm run install-native-host`** from the repo root and restart Chrome. If they skip native messaging, they can keep **`npm run relay`** in a terminal and configure relay manually.
 
 ## After installation: what this skill adds
 

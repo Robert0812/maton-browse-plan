@@ -1,5 +1,5 @@
 /**
- * Mirrors `apps/skill-factory-api/src/intent/heuristic-cluster.ts` so the review page can show Phase 3 locally.
+ * Mirrors `archive/skill-factory-api/src/intent/heuristic-cluster.ts` so the review page can show Phase 3 locally.
  */
 import type { TraceEvent } from "./types.js";
 

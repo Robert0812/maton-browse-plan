@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 /** Living Skill host: stable tool names while backend swaps P0/P1/P2 handlers remotely. */
 const server = new McpServer(
-  { name: "wondersagent-skill-host", version: "0.1.0" },
+  { name: "maton-browse-plan-mcp-skill-host", version: "0.1.0" },
   { capabilities: { tools: {} } },
 );
 

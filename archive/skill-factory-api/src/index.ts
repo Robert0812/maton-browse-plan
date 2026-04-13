@@ -2,6 +2,8 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { registerPipelineRoutes } from "./routes/pipeline.js";
 import { registerHealthRoutes } from "./routes/health.js";
+import { registerHarnessSyncRoutes } from "./routes/harness-sync.js";
+import { describeOpenAiKeySource, loadOpenAiCompatConfig } from "./config/load-openai-config.js";
 
 const app = Fastify({ logger: true });
 
@@ -29,11 +31,13 @@ app.get("/", async () => ({
   get: {
     health: "/health",
     pipelinePhases: "/v1/pipeline",
+    latestHarness: "/v1/sync/harness-installer?userId=chrome-extension",
   },
-  post: { capture: "/v1/pipeline/capture" },
+  post: { capture: "/v1/pipeline/capture", publishHarness: "/v1/sync/harness-installer" },
 }));
 
 await registerHealthRoutes(app);
+await registerHarnessSyncRoutes(app);
 await registerPipelineRoutes(app);
 
 const port = Number(process.env.PORT ?? 8787);
@@ -42,6 +46,15 @@ const host = process.env.HOST ?? "127.0.0.1";
 try {
   await app.listen({ port, host });
   app.log.info(`Skill Factory API listening on http://${host}:${port}`);
+  const oa = loadOpenAiCompatConfig();
+  app.log.info(
+    {
+      phase4OpenAiKeySource: describeOpenAiKeySource(oa.source),
+      phase4OpenAiBaseUrl: oa.baseUrl,
+      phase4HasOpenAiKey: Boolean(oa.apiKey),
+    },
+    "Phase 4 LLM: which credential source is active (Downloads > api.md > env)",
+  );
 } catch (err) {
   app.log.error(err);
   process.exit(1);

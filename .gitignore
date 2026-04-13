@@ -6,6 +6,7 @@ build/
 .env
 .env.*
 !.env.example
+apps/skill-factory-api/api.md
 .DS_Store
 *.pem
 coverage/

@@ -13,3 +13,5 @@ export const SF_RELAY_REFRESH_PRESET_KEY = "sf_relay_refresh_preset";
 export const SF_LAST_INGEST_STATS_KEY = "sf_last_ingest_stats";
 
 export const MATON_RELAY_REFRESH_ALARM = "maton_relay_refresh";
+/** `chrome.storage.session` — throttles catch-up ingest retries (`number` ms epoch). */
+export const RELAY_CATCHUP_LAST_ATTEMPT_KEY = "relay_catchup_last_attempt_at";

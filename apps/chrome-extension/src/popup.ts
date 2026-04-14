@@ -46,8 +46,11 @@ function formatClock(iso: string | undefined | null): string {
 
 function formatNextPush(nextMs: number | null | undefined): string {
   if (nextMs == null || Number.isNaN(nextMs)) return "—";
+  const now = Date.now();
+  /** Scheduled time is in the past — refresh did not advance (relay down, missed alarm, etc.). */
+  if (nextMs < now - 120_000) return "overdue — keep npm run relay running";
   const d = new Date(nextMs);
-  if (nextMs <= Date.now() + 90_000) return "soon";
+  if (nextMs <= now + 90_000) return "soon";
   return d.toLocaleString(undefined, {
     month: "short",
     day: "numeric",
@@ -175,15 +178,17 @@ btnStart.addEventListener("click", () => {
       });
 
       await chrome.alarms.clear(MATON_RELAY_REFRESH_ALARM);
+      const refreshMin = relayRefreshPresetToPeriodMinutes(relayPreset);
       await chrome.alarms.create(MATON_RELAY_REFRESH_ALARM, {
-        periodInMinutes: relayRefreshPresetToPeriodMinutes(relayPreset),
+        delayInMinutes: refreshMin,
+        periodInMinutes: refreshMin,
       });
 
       await chrome.runtime.sendMessage({ type: "START_CAPTURE", preset: historyPreset });
 
       await refreshAccumulationPanel();
     } catch (e) {
-      showPanelError(e instanceof Error ? e.message : String(e));
+      showPanelError(formatNativeRelayError(e));
     } finally {
       btnStart.disabled = false;
       btnStop.disabled = false;

@@ -8,13 +8,18 @@ import {
   EVENTS_LIVE_KEY,
   LEGACY_EVENTS_KEY,
   MATON_RELAY_REFRESH_ALARM,
+  RELAY_CATCHUP_LAST_ATTEMPT_KEY,
   SF_CAPTURE_PRESET_KEY,
   SF_LAST_INGEST_STATS_KEY,
   SF_LAST_RELAY_PUSH_AT_KEY,
   SF_RELAY_REFRESH_PRESET_KEY,
   SF_RELAY_SESSION_ACTIVE_KEY,
 } from "./lib/storage-keys.js";
-import { presetToStartMs, relayRefreshPresetToPeriodMs } from "./lib/time-range.js";
+import {
+  presetToStartMs,
+  relayRefreshPresetToPeriodMinutes,
+  relayRefreshPresetToPeriodMs,
+} from "./lib/time-range.js";
 import type { CapturePreset, LastIngestStats, RelayRefreshPreset, TraceEvent } from "./lib/types.js";
 
 function countHistoryRowsInWindow(events: TraceEvent[], preset: CapturePreset): number {
@@ -129,6 +134,92 @@ const storageInitDone = (async () => {
   }
 })();
 
+/** Min time between catch-up ingest attempts when a refresh is overdue (relay errors, missed alarms). */
+const RELAY_CATCHUP_COOLDOWN_MS = 180_000;
+
+/**
+ * If the last successful relay push is older than the refresh interval, run ingest again.
+ * Throttled so a dead relay does not hammer localhost on every popup tick.
+ */
+async function relayRefreshCatchUpIfDue(): Promise<void> {
+  const stored = await chrome.storage.local.get([
+    SF_RELAY_SESSION_ACTIVE_KEY,
+    SF_CAPTURE_PRESET_KEY,
+    SF_LAST_RELAY_PUSH_AT_KEY,
+    SF_RELAY_REFRESH_PRESET_KEY,
+  ]);
+  if (stored[SF_RELAY_SESSION_ACTIVE_KEY] !== true) return;
+
+  const preset = (stored[SF_CAPTURE_PRESET_KEY] as CapturePreset | undefined) ?? "3d";
+  const relayPreset = (stored[SF_RELAY_REFRESH_PRESET_KEY] as RelayRefreshPreset | undefined) ?? "3h";
+  const lastRelayPushAt = stored[SF_LAST_RELAY_PUSH_AT_KEY];
+  if (typeof lastRelayPushAt !== "string") return;
+
+  const lastT = Date.parse(lastRelayPushAt);
+  if (Number.isNaN(lastT)) return;
+
+  const periodMs = relayRefreshPresetToPeriodMs(relayPreset);
+  if (Date.now() < lastT + periodMs - 10_000) return;
+
+  const { [RELAY_CATCHUP_LAST_ATTEMPT_KEY]: prevAttempt } = await chrome.storage.session.get(
+    RELAY_CATCHUP_LAST_ATTEMPT_KEY,
+  );
+  const lastAttempt = typeof prevAttempt === "number" ? prevAttempt : 0;
+  if (Date.now() - lastAttempt < RELAY_CATCHUP_COOLDOWN_MS) return;
+
+  await chrome.storage.session.set({ [RELAY_CATCHUP_LAST_ATTEMPT_KEY]: Date.now() });
+
+  const result = await runHistoryRescanAndRelayIngest(preset);
+  if (result.ok) {
+    const relayPort = await getRelayPortFromSettings();
+    const stats: LastIngestStats = {
+      eventCount: result.eventCount,
+      skipped: result.skipped,
+      siteCount: result.siteCount,
+      relayPort,
+    };
+    await chrome.storage.local.set({
+      [SF_LAST_RELAY_PUSH_AT_KEY]: new Date().toISOString(),
+      [SF_LAST_INGEST_STATS_KEY]: stats,
+    });
+  } else {
+    console.warn("[maton-browse] relay catch-up ingest failed", result.detail);
+  }
+}
+
+/** Recreate the repeating alarm if Chrome dropped it (restart, sleep). */
+async function ensureRelayRefreshAlarm(): Promise<void> {
+  const stored = await chrome.storage.local.get([
+    SF_RELAY_SESSION_ACTIVE_KEY,
+    SF_RELAY_REFRESH_PRESET_KEY,
+    SF_LAST_RELAY_PUSH_AT_KEY,
+  ]);
+  if (stored[SF_RELAY_SESSION_ACTIVE_KEY] !== true) {
+    await chrome.alarms.clear(MATON_RELAY_REFRESH_ALARM);
+    return;
+  }
+
+  const relayPreset = (stored[SF_RELAY_REFRESH_PRESET_KEY] as RelayRefreshPreset | undefined) ?? "3h";
+  const periodMin = relayRefreshPresetToPeriodMinutes(relayPreset);
+  const existing = await chrome.alarms.get(MATON_RELAY_REFRESH_ALARM);
+  if (existing) return;
+
+  let delayMin = periodMin;
+  const lastRelayPushAt = stored[SF_LAST_RELAY_PUSH_AT_KEY];
+  if (typeof lastRelayPushAt === "string") {
+    const lastT = Date.parse(lastRelayPushAt);
+    if (!Number.isNaN(lastT)) {
+      const msUntilDue = lastT + relayRefreshPresetToPeriodMs(relayPreset) - Date.now();
+      delayMin = Math.max(1, Math.min(periodMin, Math.ceil(msUntilDue / 60_000)));
+    }
+  }
+
+  await chrome.alarms.create(MATON_RELAY_REFRESH_ALARM, {
+    delayInMinutes: delayMin,
+    periodInMinutes: periodMin,
+  });
+}
+
 function keyTab(tabId: number): string {
   return String(tabId);
 }
@@ -172,6 +263,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         break;
       }
       case "GET_STATUS": {
+        await relayRefreshCatchUpIfDue();
+        await ensureRelayRefreshAlarm();
         const active = await isCaptureActive();
         const stored = await chrome.storage.local.get([
           SF_CAPTURE_PRESET_KEY,
@@ -310,7 +403,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           [SF_RELAY_SESSION_ACTIVE_KEY]: false,
         });
         await chrome.storage.local.remove([LEGACY_EVENTS_KEY, SF_LAST_RELAY_PUSH_AT_KEY, SF_LAST_INGEST_STATS_KEY]);
-        await chrome.storage.session.remove(SESSION_STATE_KEY);
+        await chrome.storage.session.remove([SESSION_STATE_KEY, RELAY_CATCHUP_LAST_ATTEMPT_KEY]);
         await syncLiveRecordingBadge();
         sendResponse({ ok: true });
         break;
@@ -354,11 +447,21 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  void syncLiveRecordingBadge();
+  void (async () => {
+    await storageInitDone;
+    await relayRefreshCatchUpIfDue();
+    await ensureRelayRefreshAlarm();
+    await syncLiveRecordingBadge();
+  })();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  void syncLiveRecordingBadge();
+  void (async () => {
+    await storageInitDone;
+    await relayRefreshCatchUpIfDue();
+    await ensureRelayRefreshAlarm();
+    await syncLiveRecordingBadge();
+  })();
 });
 
 chrome.tabs.onActivated.addListener(async (activeInfo) => {

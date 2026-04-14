@@ -1,46 +1,87 @@
 ---
-name: api-gateway-browse-extension
-version: 1.2.4
+name: maton-browse-plan
+version: 1.3.1
 description: >-
-  Guides the user through building and loading the Maton browse-capture Chrome extension from
-  the maton-browse-plan repository (apps/chrome-extension), then combines exported matonPlan JSON
-  with the API Gateway skill to suggest Maton OAuth connectors from real browsing; fetches
-  matonPlan via the local relay GET /latest when the relay is running.
+  Guides the user through installing the Maton API Plan — browsing capture Chrome extension from
+  the Chrome Web Store (or building from source), then combines exported matonPlan JSON with the
+  API Gateway skill to suggest Maton OAuth connectors from real browsing; fetches matonPlan via
+  the local relay GET /latest when the relay is running.
 license: MIT-0
-requires:
-  env:
-    MATON_API_KEY: "Maton API key (same as base API Gateway skill)"
+metadata:
+  openclaw:
+    requires:
+      env:
+        - MATON_API_KEY
+    primaryEnv: MATON_API_KEY
+    homepage: https://github.com/Robert0812/maton-browse-plan
 ---
 
-# API Gateway · Browse preferences (extended)
+# Maton browse plan · API Gateway extension
 
-> **Agent behavior (read this first):** If the user just added this skill or says they want browse-based Maton hints, **do not** recite the YAML `description`, version, or any host “What’s New” text to them as if it were help. Unless they confirm the extension is already loaded in Chrome, **start with the installation steps in the next section**—run commands in their repo when you have a terminal, and give exact UI clicks for Chrome. After install, the extension appears on `chrome://extensions` as **Maton API plan — browsing capture**.
+## Chrome Web Store link (always give users this)
+
+**Official install URL** — copy verbatim when the user needs the extension:
+
+`https://chromewebstore.google.com/detail/dgecpbbjdgiindogaboidejihbmkhnai`
+
+**Listing page (same destination):** [Maton API Plan — browsing capture](https://chromewebstore.google.com/detail/dgecpbbjdgiindogaboidejihbmkhnai)
+
+Do **not** skip this link during onboarding. Most users should install from the store; only send developers to **Build from source** (below).
+
+> **Agent behavior (read this first):** If the user just added this skill or says they want browse-based Maton hints, **do not** recite the YAML `description`, version, or any host “What’s New” text to them as if it were help. Unless they clearly confirm the extension is **already installed** (store or unpacked), your **first concrete step** is to **give them the Chrome Web Store URL above** (paste the `https://…` line or the markdown link) and short install clicks—**before** relay URLs, `matonPlan`, or Maton API talk. Prefer the **store** for everyone except contributors; use repo **build + Load unpacked** only when they are developing or cannot use the store. After install, the extension appears on `chrome://extensions` as **Maton API plan — browsing capture**.
 
 ## Install the Chrome extension (required before matonPlan)
 
-The extension is **only** shipped as source in **`apps/chrome-extension`** (not assumed to be on the Chrome Web Store). Walk the user through this **before** discussing relay URLs or Maton diffs.
+Walk the user through extension install **before** discussing relay URLs or Maton diffs.
 
-**Prerequisites:** Node **≥ 20**, **Google Chrome** (or Chromium), and a clone of **this** repository on their machine (paths below are relative to the repo root).
+### Install from Chrome Web Store (default)
 
-**1. Build** — in a terminal at the repo root:
+**Listing:** [**Maton API Plan — browsing capture**](https://chromewebstore.google.com/detail/dgecpbbjdgiindogaboidejihbmkhnai) (Chrome Web Store).
+
+1. Open the link in **Google Chrome** (or another Chromium browser that supports the store).
+2. Click **Add to Chrome** / **Install** and accept permissions when prompted.
+3. Optional: pin the extension from the puzzle menu.
+
+**Stable extension ID (Web Store build):** `dgecpbbjdgiindogaboidejihbmkhnai` — same for every user; use it for **`install-native-host`** (below) without asking users to copy an ID from `chrome://extensions`.
+
+When they use capture, the browser may ask for **history**, **tabs**, and related access — they should **Allow** or exports will be incomplete.
+
+### Build from source (development only)
+
+Use this when contributing to **`apps/chrome-extension`** or when the user cannot install from the store.
+
+**Prerequisites:** Node **≥ 20**, **Google Chrome** (or Chromium), and a clone of **[maton-browse-plan](https://github.com/Robert0812/maton-browse-plan)** (paths below are relative to the repo root).
+
+**1. Build** — at the repo root:
 
 ```bash
 npm install
 npm run build --workspace=@maton-browse-plan/chrome-extension
 ```
 
-**2. Load unpacked** — tell the user to:
+**2. Load unpacked**
 
 1. Open `chrome://extensions`.
 2. Enable **Developer mode** (top right).
 3. Click **Load unpacked**.
-4. Choose the folder **`apps/chrome-extension/dist`** (the directory that contains `manifest.json`; use **Browse** and the full path if needed).
+4. Choose **`apps/chrome-extension/dist`** (the folder that contains `manifest.json`).
 
-**3. Permissions** — Pin the extension if they want. When they use capture, Chrome may ask for **history**, **tabs**, and broad access — they should **Allow** or exports will be incomplete.
+Unpacked installs get a **different extension ID** per path; for native messaging, copy the ID from `chrome://extensions` for that build.
 
-**4. Get JSON to the agent** — Either **Review → Download** in the extension, **or** run **`npm run relay`** from the repo root and use the **`GET /latest`** flow described in **Local relay** (below).
+### Get JSON to the agent
 
-**Optional — start/stop relay from the extension popup:** Build **`npm run build --workspace=@maton-browse-plan/maton-native-host`**, copy the **Extension ID** from `chrome://extensions`, then **`EXTENSION_ID=<id> npm run install-native-host`** from the repo root and restart Chrome. If they skip native messaging, they can keep **`npm run relay`** in a terminal and configure relay manually.
+Either **Review → Download** in the extension, **or** run **`npm run relay`** from the **maton-browse-plan** repo root and use the **`GET /latest`** flow in **Local relay** (below).
+
+### Optional — start/stop relay from the extension popup (native messaging)
+
+1. Build the helper: **`npm run build --workspace=@maton-browse-plan/maton-native-host`**
+2. From the **maton-browse-plan** repo root, register the host:
+   - **Web Store extension (recommended):**  
+     **`EXTENSION_ID=dgecpbbjdgiindogaboidejihbmkhnai npm run install-native-host`**
+   - **Unpacked dev build:** use **`EXTENSION_ID=<id>`** with the ID shown on `chrome://extensions` for that folder.
+3. Restart the browser, reload the extension if needed, then use **Start** in the popup.
+
+The installer writes the manifest for common Chromium-based browsers (Chrome, Brave, Edge, Arc, etc.); **`NATIVE_MSG_ONLY=chrome`** limits install to Google Chrome. If the popup reports **forbidden** native host access, **`allowed_origins`** does not match—re-run with the correct ID for **that** install. If they skip native messaging, keep **`npm run relay`** in a terminal and configure relay manually.
 
 ## After installation: what this skill adds
 
@@ -116,4 +157,4 @@ Hermes (and similar hosts) only execute HTTP when **you** issue the request in t
 
 ## Extension output
 
-Repo: `apps/chrome-extension` — download filename pattern `maton-browse-capture-*.json`; top-level fields include **`preset`**, **`events`**, **`exportedAt`**, **`matonPlan`**.
+**Web Store** and **source** builds use the same export shape. Source lives in repo `apps/chrome-extension`; download filename pattern `maton-browse-capture-*.json`; top-level fields include **`preset`**, **`events`**, **`exportedAt`**, **`matonPlan`**.

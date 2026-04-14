@@ -7,6 +7,10 @@
  *   EXTENSION_ID=abcd npm run install-native-host   (from repo root)
  *
  * Find the id on chrome://extensions (Developer mode) for this unpacked extension.
+ *
+ * By default (macOS/Linux/Windows) the same manifest is written to every known Chromium-based
+ * browser NativeMessagingHosts directory so "Access … forbidden" does not happen when you use
+ * Brave, Edge, Chromium, etc. Set NATIVE_MSG_ONLY=chrome to only install for Google Chrome.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
@@ -32,15 +36,43 @@ const wrapperPath = path.join(distDir, wrapperName);
 
 await writeNativeWrappers(distDir);
 
-function chromeNativeHostsDir() {
+/** @returns {string[]} */
+function chromeNativeHostsDirs() {
+  const home = os.homedir();
+  const onlyChrome = process.env.NATIVE_MSG_ONLY?.trim().toLowerCase() === "chrome";
+
   if (process.platform === "darwin") {
-    return path.join(os.homedir(), "Library/Application Support/Google/Chrome/NativeMessagingHosts");
+    const sup = path.join(home, "Library/Application Support");
+    const all = [
+      path.join(sup, "Google/Chrome/NativeMessagingHosts"),
+      path.join(sup, "Google/Chrome Canary/NativeMessagingHosts"),
+      path.join(sup, "Chromium/NativeMessagingHosts"),
+      path.join(sup, "BraveSoftware/Brave-Browser/NativeMessagingHosts"),
+      path.join(sup, "Microsoft Edge/NativeMessagingHosts"),
+      path.join(sup, "Arc/User Data/NativeMessagingHosts"),
+    ];
+    return onlyChrome ? [all[0]] : all;
   }
+
   if (isWin) {
-    const local = process.env.LOCALAPPDATA || path.join(os.homedir(), "AppData/Local");
-    return path.join(local, "Google/Chrome/User Data/NativeMessagingHosts");
+    const local = process.env.LOCALAPPDATA || path.join(home, "AppData/Local");
+    const all = [
+      path.join(local, "Google/Chrome/User Data/NativeMessagingHosts"),
+      path.join(local, "Google/Chrome SxS/User Data/NativeMessagingHosts"),
+      path.join(local, "Chromium/User Data/NativeMessagingHosts"),
+      path.join(local, "BraveSoftware/Brave-Browser/User Data/NativeMessagingHosts"),
+      path.join(local, "Microsoft/Edge/User Data/NativeMessagingHosts"),
+    ];
+    return onlyChrome ? [all[0]] : all;
   }
-  return path.join(os.homedir(), ".config/google-chrome/NativeMessagingHosts");
+
+  const all = [
+    path.join(home, ".config/google-chrome/NativeMessagingHosts"),
+    path.join(home, ".config/chromium/NativeMessagingHosts"),
+    path.join(home, ".config/BraveSoftware/Brave-Browser/NativeMessagingHosts"),
+    path.join(home, ".config/microsoft-edge/NativeMessagingHosts"),
+  ];
+  return onlyChrome ? [all[0]] : all;
 }
 
 const HOST_NAME = "com.maton.browse_relay";
@@ -52,13 +84,19 @@ const manifest = {
   allowed_origins: [`chrome-extension://${extensionId}/`],
 };
 
-const dir = chromeNativeHostsDir();
-const outFile = path.join(dir, `${HOST_NAME}.json`);
+const dirs = chromeNativeHostsDirs();
+for (const dir of dirs) {
+  const outFile = path.join(dir, `${HOST_NAME}.json`);
+  await mkdir(dir, { recursive: true });
+  await writeFile(outFile, JSON.stringify(manifest, null, 2), "utf8");
+  console.error(`Wrote ${outFile}`);
+}
 
-await mkdir(dir, { recursive: true });
-await writeFile(outFile, JSON.stringify(manifest, null, 2), "utf8");
-
-console.error(`Wrote ${outFile}`);
 console.error(`Wrapper: ${wrapperPath}`);
 console.error(`Node (embedded in wrapper): ${process.execPath}`);
-console.error("Restart Chrome if it was running. Reload the extension, then use Start relay in the popup.");
+console.error(
+  "Restart the browser if it was running. Reload the extension, then use Start relay in the popup.",
+);
+console.error(
+  `If the popup still says access is forbidden, confirm EXTENSION_ID matches this extension on chrome://extensions (id changes if you load a different unpacked folder).`,
+);

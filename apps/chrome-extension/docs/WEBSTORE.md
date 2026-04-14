@@ -55,13 +55,33 @@ Use short text aligned with the code:
 > **Privacy**  
 > Nothing is sent to Maton or third parties **by default**. Data stays on your device until **you** export or push to **localhost** relay only. See the linked privacy policy for details.
 
-After approval, add the **Web Store URL** to `skills/clawhub-api-gateway-browse/SKILL.md` and the repo README so agents can say “Install from Chrome Web Store” instead of only Load unpacked.
+**Live listing:** [Maton API Plan — browsing capture](https://chromewebstore.google.com/detail/dgecpbbjdgiindogaboidejihbmkhnai) (`skills/maton-browse-plan/SKILL.md` and the repo README already point end users to this URL).
+
+## Native messaging and extension IDs (published vs development)
+
+- **Load unpacked / local builds** — Chrome derives the extension ID from the unpacked path, so it **can differ** per clone and change if the folder moves. That is why **`EXTENSION_ID=… npm run install-native-host`** asks for a value from `chrome://extensions`: it must match **that** install.
+
+- **Chrome Web Store installs** — Every user who installs the same listing gets the **same, stable extension ID** — for this listing: **`dgecpbbjdgiindogaboidejihbmkhnai`**. You can also confirm it in the [Developer Dashboard](https://chrome.google.com/webstore/devconsole) or under `chrome://extensions` after installing from the store.
+
+**Retail users should not paste an ID anywhere.** Ship the optional native host installer (or document **`EXTENSION_ID=dgecpbbjdgiindogaboidejihbmkhnai npm run install-native-host`**) so **`allowed_origins`** matches the store build. Only maintainers or contributors who use **unpacked** development builds need a **different** **`EXTENSION_ID`** from `chrome://extensions`.
 
 ## Updates
 
 - Bump **`version`** in `src/manifest.json` (semver) for each new upload.
 - Re-run **`npm run package:webstore`** and upload the new zip.
 - Keep `docs/PRIVACY.md` in sync if behavior or data practices change.
+
+### Submitting an update (dashboard)
+
+1. **Developer Dashboard** → your item → **Package** (or **Upload new package**).
+2. Upload **`maton-browse-plan-v<version>-webstore.zip`** from `apps/chrome-extension/` (same layout as first publish: `manifest.json` at zip root).
+3. **What’s new** (example for **v1.1.0** — edit to match your release):
+
+   > Reliability: periodic relay refresh is restored after browser restarts; overdue refreshes retry when you open the popup. Clearer status when the local relay is unreachable. Review page links the Chrome Web Store listing and ClawHub skill.
+
+4. Submit for review. No permission changes are expected for this kind of update unless you edited `manifest.json` permissions.
+
+**v1.1.0** artifact: `maton-browse-plan-v1.1.0-webstore.zip`.
 
 ## Optional: `icons` in source control
 

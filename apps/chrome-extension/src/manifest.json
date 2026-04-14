@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Maton API plan — browsing capture",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Turns your Chrome history & live visits into matonPlan for Maton—match OAuth connectors to real usage. Private until you export.",
   "permissions": ["alarms", "storage", "tabs", "history", "nativeMessaging"],
   "host_permissions": [

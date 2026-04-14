@@ -291,7 +291,7 @@ btnDownload.addEventListener("click", () => {
     });
 
     const lines: string[] = [
-      "Download started. Feed matonPlan to the ClawHub API Gateway · Browse skill (see repo skills/clawhub-api-gateway-browse).",
+      "Download started. Feed matonPlan to the ClawHub maton-browse-plan skill (see repo skills/maton-browse-plan).",
     ];
     if (relayEnabled.checked) {
       const r = await postRelayIngest(baseUrl, relayToken.value.trim() || undefined, payload);

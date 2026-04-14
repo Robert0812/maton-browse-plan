@@ -51,6 +51,13 @@ export async function nativeRelayStatus(port: number): Promise<NativeRelayRespon
 }
 
 export function formatNativeRelayError(e: unknown): string {
-  if (e instanceof Error) return e.message;
-  return String(e);
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/forbidden/i.test(msg)) {
+    return (
+      `${msg} — Re-run install-native-host with the exact Extension ID from chrome://extensions ` +
+      `(it changes if you load a different folder). The installer must target the browser you use ` +
+      `(Chrome vs Brave vs Edge, etc.); from the repo root: EXTENSION_ID=<id> npm run install-native-host`
+    );
+  }
+  return msg;
 }
